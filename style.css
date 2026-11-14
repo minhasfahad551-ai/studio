@@ -1343,6 +1343,19 @@ footer h2 {
         grid-template-columns: 1fr;
     }
 
+    .nav-menu {
+  display: flex;             /* Items ko ek row mein lane ke liye */
+  flex-direction: row;       /* Direction horizontal rakhne ke liye */
+  justify-content: center;   /* Center mein align karne ke liye */
+  flex-wrap: nowrap;         /* Items ko next line par aane se rokne ke liye */
+  gap: 15px;                 /* Links ke beech mein space dene ke liye (apni marzi se adjust karein) */
+}
+
+/* Agar links ka text bada hai aur screen choti hai, toh font-size chota karna padh sakta hai */
+.nav-menu a {
+  white-space: nowrap;       /* Text ko break hone se roke ga */
+  font-size: 14px;           /* Mobile ke liye size thoda chota kar dein agar fit na ho */
+}
 }
 /* HERO BACKGROUND FINAL FIX */
 .hero {
