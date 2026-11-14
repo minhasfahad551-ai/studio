@@ -1392,3 +1392,80 @@ footer h2 {
   font-size: 18px;
   vertical-align: middle;
 }
+/* PREMIUM APPOINTMENT SERVICE BOXES */
+
+.service-selection {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin: 22px 0;
+}
+
+.service-selection label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 17px 16px;
+    min-height: 70px;
+
+    background: linear-gradient(135deg, #fffdf9, #f7efe4);
+    border: 1px solid #e5d4bd;
+    border-radius: 13px;
+
+    color: #44352d;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+/* HOVER EFFECT */
+
+.service-selection label:hover {
+    border-color: #ad8249;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.09);
+}
+
+/* CHECKBOX DESIGN */
+
+.service-selection input[type="checkbox"] {
+    width: 19px;
+    height: 19px;
+    min-width: 19px;
+    accent-color: #941f32;
+    cursor: pointer;
+}
+
+/* SELECTED BOX */
+
+.service-selection label:has(input:checked) {
+    background: linear-gradient(135deg, #fff4f1, #f5e5df);
+    border: 1.5px solid #941f32;
+    color: #941f32;
+    box-shadow: 0 5px 16px rgba(148,31,50,0.12);
+}
+
+/* MOBILE RESPONSIVE */
+
+@media (max-width: 600px) {
+
+    .service-selection {
+        grid-template-columns: 1fr;
+        gap: 11px;
+    }
+
+    .service-selection label {
+        padding: 15px;
+        min-height: 62px;
+        font-size: 13px;
+    }
+
+}
+/* Hide Barber Select Button Only */
+.barber-card input[type="radio"] {
+    display: none;
+}
