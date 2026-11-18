@@ -502,302 +502,227 @@
 
 
     <!-- JAVASCRIPT -->
-
-    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("DOMContentLoaded", function () {
 
-    // WHATSAPP DETAILS
+    // SETTINGS
     const NOTIFY_NUMBER = "923158466285";
     const STAFF_NAME = "Attaa Minhas";
+    const SUPABASE_URL = "https://llkyrcgxdfrdacpwqnhi.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_Id7sTHjxsHrpY5haKmhtZA_-Bd-N15n";
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const form = document.getElementById("bookingForm");
     const totalPrice = document.getElementById("totalPrice");
     const dateInput = document.getElementById("appointmentDate");
     const timeSelect = document.getElementById("appointmentTime");
+    const submitBtn = form ? form.querySelector(".booking-button") : null;
 
     if (!form || !dateInput || !timeSelect || !totalPrice) {
         console.error("Booking form elements are missing.");
         return;
     }
 
-    const services = document.querySelectorAll(
-        'input[name="services"]'
-    );
+    const services = document.querySelectorAll('input[name="services"]');
 
-
-    // LOCAL DATE
+    // LOCAL DATE (YYYY-MM-DD)
     function getLocalDate() {
-
         const now = new Date();
-
-        const local = new Date(
-            now.getTime() - now.getTimezoneOffset() * 60000
-        );
-
+        const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
         return local.toISOString().split("T")[0];
     }
 
     dateInput.min = getLocalDate();
 
-
     // UPDATE TOTAL PRICE
     function updateTotal() {
-
         let total = 0;
-
-        document.querySelectorAll(
-            'input[name="services"]:checked'
-        ).forEach(item => {
-
+        document.querySelectorAll('input[name="services"]:checked').forEach(item => {
             total += Number(item.dataset.price);
-
         });
-
-        totalPrice.textContent =
-            "Rs. " + total.toLocaleString("en-PK");
+        totalPrice.textContent = "Rs. " + total.toLocaleString("en-PK");
     }
 
-    services.forEach(service => {
-        service.addEventListener("change", updateTotal);
-    });
+    services.forEach(s => s.addEventListener("change", updateTotal));
 
+    // GET ALREADY BOOKED TIMES FOR A DATE
+    async function getTakenTimes(selectedDate) {
+        const { data, error } = await sb.rpc("get_taken_slots", { d: selectedDate });
+        if (error) {
+            console.error("Could not load taken slots:", error);
+            return [];
+        }
+        return data.map(row => row.appt_time);
+    }
 
-    // GENERATE TIME SLOTS WITHOUT DATABASE
-    function generateSlots() {
-
+    // GENERATE TIME SLOTS (HIDES BOOKED ONES)
+    async function generateSlots() {
         const selectedDate = dateInput.value;
-
         timeSelect.innerHTML = "";
 
         if (!selectedDate) {
-
-            timeSelect.innerHTML =
-                '<option value="">Select Date First</option>';
-
+            timeSelect.innerHTML = '<option value="">Select Date First</option>';
             return;
         }
 
         const date = new Date(selectedDate + "T12:00:00");
 
         if (date.getDay() === 1) {
-
-            timeSelect.innerHTML =
-                '<option value="">Monday - Call Before Booking</option>';
-
+            timeSelect.innerHTML = '<option value="">Monday - Call Before Booking</option>';
             return;
         }
 
-        const now = new Date();
+        timeSelect.innerHTML = '<option value="">Loading times...</option>';
 
+        const taken = await getTakenTimes(selectedDate);
+
+        // user may have changed the date while loading
+        if (dateInput.value !== selectedDate) return;
+
+        timeSelect.innerHTML = "";
+
+        const now = new Date();
         let availableCount = 0;
 
         for (let hour = 11; hour < 24; hour++) {
-
             for (const minute of [0, 30]) {
 
                 const period = hour >= 12 ? "PM" : "AM";
-
                 const displayHour = hour % 12 || 12;
+                const displayMinute = minute === 0 ? "00" : "30";
+                const time = displayHour + ":" + displayMinute + " " + period;
 
-                const displayMinute =
-                    minute === 0 ? "00" : "30";
-
-                const time =
-                    displayHour + ":" +
-                    displayMinute + " " + period;
-
-                const slotDate =
-                    new Date(selectedDate + "T00:00:00");
-
+                const slotDate = new Date(selectedDate + "T00:00:00");
                 slotDate.setHours(hour, minute, 0, 0);
 
-                if (
-                    selectedDate === getLocalDate() &&
-                    slotDate <= now
-                ) {
-                    continue;
-                }
+                if (selectedDate === getLocalDate() && slotDate <= now) continue;
+                if (taken.includes(time)) continue;
 
                 const option = document.createElement("option");
-
                 option.value = time;
                 option.textContent = time;
-
                 timeSelect.appendChild(option);
-
                 availableCount++;
-
             }
         }
 
         if (availableCount === 0) {
-
-            timeSelect.innerHTML =
-                '<option value="">No Available Slots</option>';
-
+            timeSelect.innerHTML = '<option value="">No Available Slots</option>';
         } else {
-
-            const firstOption = document.createElement("option");
-
-            firstOption.value = "";
-            firstOption.textContent = "Select Your Time";
-            firstOption.selected = true;
-
-            timeSelect.insertBefore(
-                firstOption,
-                timeSelect.firstChild
-            );
-
+            const first = document.createElement("option");
+            first.value = "";
+            first.textContent = "Select Your Time";
+            first.selected = true;
+            timeSelect.insertBefore(first, timeSelect.firstChild);
         }
     }
 
-
-    // DATE CHANGE
     dateInput.addEventListener("change", generateSlots);
 
-
-    // WHATSAPP BOOKING FORM
-    form.addEventListener("submit", function(event) {
-
+    // SUBMIT: SAVE TO DATABASE, THEN OPEN WHATSAPP
+    form.addEventListener("submit", async function (event) {
         event.preventDefault();
 
-        const customerName =
-            document.getElementById("customerName").value.trim();
-
-        const customerPhone =
-            document.getElementById("customerPhone").value.trim();
-
-        const selectedServices = document.querySelectorAll(
-            'input[name="services"]:checked'
-        );
-
+        const customerName = document.getElementById("customerName").value.trim();
+        const customerPhone = document.getElementById("customerPhone").value.trim();
+        const selectedServices = document.querySelectorAll('input[name="services"]:checked');
         const appointmentDate = dateInput.value;
-
         const appointmentTime = timeSelect.value;
+        const comfortPreference = document.getElementById("comfortPreference").value;
+        const msgEl = document.getElementById("customerMessage");
+        const customerMessage = msgEl ? msgEl.value.trim() : "";
 
-        const comfortPreference =
-            document.getElementById("comfortPreference").value;
-
-        const customerMessageElement =
-            document.getElementById("customerMessage");
-
-        const customerMessage = customerMessageElement
-            ? customerMessageElement.value.trim()
-            : "";
-
-
-        // CUSTOMER VALIDATION
-        if (
-            !customerName ||
-            !/^03[0-9]{9}$/.test(customerPhone)
-        ) {
-
-            alert(
-                "Please enter your name and a valid Pakistani phone number."
-            );
-
+        if (!customerName || !/^03[0-9]{9}$/.test(customerPhone)) {
+            alert("Please enter your name and a valid Pakistani phone number.");
             return;
         }
 
-
-        // SERVICE VALIDATION
         if (selectedServices.length === 0) {
-
             alert("Please select at least one service.");
-
             return;
         }
 
-
-        // DATE AND TIME VALIDATION
         if (!appointmentDate || !appointmentTime) {
-
             alert("Please select your appointment date and time.");
-
             return;
         }
 
-
-        // MONDAY VALIDATION
-        const date = new Date(
-            appointmentDate + "T12:00:00"
-        );
-
+        const date = new Date(appointmentDate + "T12:00:00");
         if (date.getDay() === 1) {
-
-            alert(
-                "Monday appointments are not scheduled regularly. Please contact the studio first."
-            );
-
+            alert("Monday appointments are not scheduled regularly. Please contact the studio first.");
             return;
         }
 
-
-        // TOTAL AND SERVICES
         let total = 0;
-
         const serviceList = [];
 
         selectedServices.forEach(service => {
-
             const price = Number(service.dataset.price);
-
             total += price;
-
-            serviceList.push(
-                service.value + " - Rs. " +
-                price.toLocaleString("en-PK")
-            );
-
+            serviceList.push(service.value + " - Rs. " + price.toLocaleString("en-PK"));
         });
 
-        const serviceDetails = serviceList.join("\n");
+        // SAVE TO DATABASE
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Saving...";
+        }
 
+        const { error } = await sb.from("bookings").insert({
+            customer_name: customerName,
+            phone: customerPhone,
+            services: serviceList.join(", "),
+            total: total,
+            appt_date: appointmentDate,
+            appt_time: appointmentTime,
+            comfort: comfortPreference,
+            message: customerMessage || null
+        });
+
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Send Appointment Request";
+        }
+
+        if (error) {
+            if (error.code === "23505") {
+                alert("Sorry, this time slot was just booked by someone else. Please choose another time.");
+                generateSlots();
+            } else {
+                console.error(error);
+                alert("Something went wrong while saving your booking. Please try again.");
+            }
+            return;
+        }
 
         // WHATSAPP MESSAGE
         const message =
-
             "NEW APPOINTMENT REQUEST - SOHNA GROOMING STUDIO\n\n" +
-
             "Customer Name: " + customerName + "\n" +
-
             "Phone Number: " + customerPhone + "\n" +
-
             "Professional: " + STAFF_NAME + "\n\n" +
-
-            "Selected Services:\n" +
-            serviceDetails + "\n\n" +
-
-            "Total Amount: Rs. " +
-            total.toLocaleString("en-PK") + "\n\n" +
-
-            "Appointment Date: " +
-            appointmentDate + "\n" +
-
-            "Appointment Time: " +
-            appointmentTime + "\n\n" +
-
-            "Comfort Preference: " +
-            comfortPreference + "\n\n" +
-
-            "Additional Message: " +
-            (customerMessage || "No additional message") + "\n\n" +
-
+            "Selected Services:\n" + serviceList.join("\n") + "\n\n" +
+            "Total Amount: Rs. " + total.toLocaleString("en-PK") + "\n\n" +
+            "Appointment Date: " + appointmentDate + "\n" +
+            "Appointment Time: " + appointmentTime + "\n\n" +
+            "Comfort Preference: " + comfortPreference + "\n\n" +
+            "Additional Message: " + (customerMessage || "No additional message") + "\n\n" +
             "Please confirm this appointment request.";
 
-
-        // OPEN WHATSAPP
         const whatsappURL =
-            "https://wa.me/" + NOTIFY_NUMBER +
-            "?text=" + encodeURIComponent(message);
+            "https://wa.me/" + NOTIFY_NUMBER + "?text=" + encodeURIComponent(message);
 
-        window.open(whatsappURL, "_blank");
+        alert("Your request has been saved. WhatsApp will open now. Please press Send to complete your request.");
 
+        // same-tab redirect works on all phones (popups get blocked after async work)
+        window.location.href = whatsappURL;
     });
 
 });
 </script>
+    
 
 </body>
 </html>
